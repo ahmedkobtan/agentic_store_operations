@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "walmart_ahmedkobtan_agentic_store_operations"
+version = "0.1.0"
+description = ""
+authors = ["Luis Ek - lek18 <Luis.ek@walmart.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-cloud-storage = "2.5.0"
+pandas = "==2.2.3"
+numpy = "==2.2.3"
+delta-spark = "2.3.0"
+pydantic = "^2.8.0"
+openpyxl = "^3.1.5"
+pyarrow = "^22.0.0"
+matplotlib = "^3.10.7"
+ipykernel = "^7.1.0"
+prophet = "^1.2.1"
+plotly = "^6.4.0"
+joblib = "^1.5.2"
+ortools = "^9.14.6206"
+pyyaml = "^6.0.3"
+SQLAlchemy = "^2.0.34"
+streamlit = "^1.39.0"
+fastapi = "^0.115.0"
+uvicorn = "^0.32.0"
+pre-commit = "^4.5.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+coverage = "^7.5.1"
+pytest-cov = "^5.0.0"
+pytest-mock = "^3.14.0"
+httpx = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

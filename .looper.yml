@@ -1,0 +1,11 @@
+inherit: job:///looper-templates:looper/.base-looper-pro.yml
+
+envs:
+  global:
+    variables:
+      PYPI_URL: "https://pypi.ci.artifacts.walmart.com/artifactory/api/pypi/ahmedkobtan-pypi"
+      GITHUB_ORG: 'ahmedkobtan'
+      GITHUB_REPO: 'agentic_store_operations'
+      PROJECT_DIR: './'
+      DOCKER_IMAGE_NAME: 'poetry-1.8-python3.10.14'
+      WM_DOCKER_REGISTRY: 'docker.ci.artifacts.walmart.com'

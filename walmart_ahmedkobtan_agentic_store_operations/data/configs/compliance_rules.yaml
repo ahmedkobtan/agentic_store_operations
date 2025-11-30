@@ -1,0 +1,5 @@
+# Compliance rules configuration
+max_consecutive_days: 4
+break_threshold_hours: 7.0
+break_min_minutes: 30
+minor_cutoff_hour: 21

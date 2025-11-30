@@ -1,0 +1,8 @@
+[run]
+source = walmart_ahmedkobtan_agentic_store_operations
+omit =
+    tests/*
+    setup.py
+
+[report]
+skip_empty = True

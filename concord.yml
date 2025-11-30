@@ -1,0 +1,25 @@
+imports:
+  - git:
+      url: "https://gecgithub01.walmart.com/dsi-dataventures-luminate/concord-templates.git"
+      path: "artifact-template"
+
+configuration:
+  runtime: "concord-v2"
+  processTimeout: "PT5H"
+  debug: false
+  dependencies:
+    - "mvn://com.walmartlabs.concord.plugins:looper-task:latest"
+    - "mvn://com.walmartlabs.concord.plugins:gatekeeper-task:1.28.13"
+    - "mvn://com.walmartlabs.concord.plugins:git:latest"
+    - "mvn://com.walmartlabs.concord.plugins:servicenow-task:latest"
+  arguments:
+    USERNAME: "UPDATE" # Needs WRITE access to GIT repo below.
+    JOB_NAME: "Looper Pro Job Name NONE" #Looper job name that’ll be built
+    GITHUB_ORG: 'ahmedkobtan'
+    GITHUB_REPO: 'agentic_store_operations'
+    GIT_ACCESS_TOKEN: ${crypto.decryptString("UPDATE")}
+
+
+flows:
+  default:
+    - call: main_flow
