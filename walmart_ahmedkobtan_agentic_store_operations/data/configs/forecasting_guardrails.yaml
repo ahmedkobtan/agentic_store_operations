@@ -1,0 +1,28 @@
+store:
+  open_hour: 6        # 06:00 local
+  close_hour: 21      # 21:00 local; # exclusive (so last hour is 20)
+
+guard_rails:
+  min_vol: 20.0        # minimum volume to trigger staffing
+
+quantiles:
+  base_quantile: 0.50        # p50 by default
+  promote_to_p90_if_rel_uncertainty_ge: 0.50   # if (p90 - p50)/max(p50,1) >= 0.5
+  # If you want slightly more conservative staffing at peaks,
+  # bump promote_to_p90_if_rel_uncertainty_ge down to 0.35 (more hours will staff to p90).
+
+always_p90:   # NEW (optional) — day-of-week and hour windows
+  - dow: fri
+    start_hour: 10
+    end_hour: 14
+  - dow: sat
+    start_hour: 10
+    end_hour: 14
+
+cashier_mapping:
+  tx_per_cashier_per_hour: 20.0
+  cashier_trigger_tx_per_hour: 5.0   # try 10.0 if you want to be stricter
+
+lead_policy:
+  lead_required_all_open_hours: true  # keep 1 lead every hour [6,20)
+  # alternative later: lead only when cashiers > 0

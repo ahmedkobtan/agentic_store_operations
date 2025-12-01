@@ -1,0 +1,55 @@
+store:
+  open_hour: 6        # 06:00 local
+  close_hour: 21      # 21:00 local; # exclusive (so last hour is 20)
+
+roles:
+  - name: lead
+    # Always ensure a lead is present whenever open
+    min_headcount:
+      "06:00-21:00": 1
+  - name: cashier
+    min_headcount: {}
+  - name: floor
+    min_headcount: {}
+
+employees:
+  defaults:
+    min_shift_hours: 4
+    max_shift_hours: 8
+    max_hours_per_day: 8
+    min_rest_hours: 12
+    # Optional weekly cap if you simulate a week:
+    max_hours_per_week: 40
+  role_shift_hours:
+    lead:
+      min: 4
+      max: 8
+    cashier:
+      min: 2
+      max: 8
+    floor:
+      min: 4
+      max: 8
+
+wages:
+  lead: 23.50
+  cashier: 16.00
+  floor: 17.50
+
+objective:
+  weights:
+    # Prioritize serving demand; penalize shortfall hardest
+    shortfall: 10.0
+    overstaff: 3.0   # from 2.0
+    cost: 1.0
+    fairness: 0.1
+
+buffers:
+  use_p50_as_base: true
+  add_bias_from_learning: true
+  cap_bias_per_hour: 2
+
+overstaff_caps:
+  lead: 0
+  cashier: 0
+  floor: 0
