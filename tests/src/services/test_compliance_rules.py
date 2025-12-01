@@ -109,3 +109,4 @@ def test_compliance_config_override_removes_break_violation(tmp_path):
     assert "break_required" not in codes, codes
     assert data["schema_version"] == "1.0"
     assert "config_override" in data["checked_rules"]
+    assert data.get("rules_version") == "1.0"

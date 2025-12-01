@@ -1,4 +1,5 @@
 # Compliance rules configuration
+rules_version: "1.0"
 max_consecutive_days: 4
 break_threshold_hours: 7.0
 break_min_minutes: 30

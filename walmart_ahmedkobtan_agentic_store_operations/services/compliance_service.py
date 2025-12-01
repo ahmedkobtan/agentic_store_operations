@@ -19,6 +19,7 @@ class ComplianceResponse(BaseModel):
     violations: List[Violation]
     schema_version: str
     checked_rules: List[str]
+    rules_version: Optional[str] = None
 
 
 app = FastAPI(title="Compliance Service")
@@ -56,6 +57,7 @@ def validate_schedule(
         df = pd.read_csv(path)
 
         # External rule config (YAML) override if provided
+        rules_version: Optional[str] = None
         if config_path:
             try:
                 cfg = read_yaml(config_path)
@@ -63,6 +65,7 @@ def validate_schedule(
                 break_threshold_hours = float(cfg.get("break_threshold_hours", break_threshold_hours))
                 break_min_minutes = int(cfg.get("break_min_minutes", break_min_minutes))
                 minor_cutoff_hour = int(cfg.get("minor_cutoff_hour", minor_cutoff_hour))
+                rules_version = cfg.get("rules_version")
                 checked.append("config_override")
             except Exception as e:
                 violations.append(Violation(code="config_read", message=f"Config read error: {e}"))
@@ -137,7 +140,7 @@ def validate_schedule(
                 violations.append(Violation(code="roster_read", message=f"Roster read error: {e}"))
 
         passed = len(violations) == 0
-        return ComplianceResponse(pass_=passed, violations=violations, schema_version=SCHEMA_VERSION, checked_rules=checked)
+        return ComplianceResponse(pass_=passed, violations=violations, schema_version=SCHEMA_VERSION, checked_rules=checked, rules_version=rules_version)
     except Exception as e:
         violations.append(Violation(code="error", message=str(e)))
-        return ComplianceResponse(pass_=False, violations=violations, schema_version=SCHEMA_VERSION, checked_rules=checked)
+        return ComplianceResponse(pass_=False, violations=violations, schema_version=SCHEMA_VERSION, checked_rules=checked, rules_version=None)

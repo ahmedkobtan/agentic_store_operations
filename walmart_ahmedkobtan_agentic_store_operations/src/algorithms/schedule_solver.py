@@ -411,6 +411,65 @@ def propose_schedule(
     # Candidates
     cand = _generate_all_candidates(emps, days, cons, demand_lead, demand_cashier, demand_floor, day_to_idx, H_per_day)
 
+    # Break modeling (simple post-generation augmentation):
+    # For candidates with length >= 7 (hard-coded threshold aligned with compliance break_threshold_hours),
+    # create an alternate pair of split shifts with a 1-hour gap to represent a break.
+    BREAK_THRESHOLD = 7  # hours
+    augmented: List[CandidateShift] = []
+    # Track explicit break metadata for split shifts: sid -> (break_start_hour, break_end_hour)
+    break_meta: Dict[int, Tuple[int, int]] = {}
+    next_sid = max([c.sid for c in cand]) + 1 if cand else 0
+    for c in cand:
+        if c.length >= BREAK_THRESHOLD and c.role != "lead":  # do not split lead coverage shifts
+            mid = c.start_hour + c.length // 2
+            # First segment: start -> mid-1
+            seg1_len = mid - c.start_hour
+            # Second segment: mid+1 -> end (reserve one hour gap for break)
+            seg2_start = mid + 1
+            seg2_len = c.end_hour - seg2_start
+            # Only create if both segments respect min_shift_hours
+            if seg1_len >= cons.min_shift_hours and seg2_len >= cons.min_shift_hours:
+                # Build hours masks
+                seg1_mask = [h for h in c.hours_mask if (c.start_hour + h) < mid]
+                seg2_mask = [h for h in c.hours_mask if (c.start_hour + h) >= seg2_start]
+                # Remap hours mask relative to original open hour
+                # CandidateShift expects absolute hour indices? Using existing pattern: hours_mask are slots relative to day open.
+                # We'll recompute masks based on day and open_hour
+                day_open = cons.open_hour
+                seg1_slots = [h for h in range(c.start_hour - day_open, mid - day_open)]
+                seg2_slots = [h for h in range(seg2_start - day_open, c.end_hour - day_open)]
+                cs1 = CandidateShift(
+                    sid=next_sid,
+                    employee_id=c.employee_id,
+                    role=c.role,
+                    day=c.day,
+                    start_hour=c.start_hour,
+                    end_hour=mid,
+                    length=seg1_len,
+                    hours_mask=seg1_slots
+                )
+                next_sid += 1
+                cs2 = CandidateShift(
+                    sid=next_sid,
+                    employee_id=c.employee_id,
+                    role=c.role,
+                    day=c.day,
+                    start_hour=seg2_start,
+                    end_hour=c.end_hour,
+                    length=seg2_len,
+                    hours_mask=seg2_slots
+                )
+                next_sid += 1
+                augmented.extend([cs1, cs2])
+                # Record a 1-hour break between segments
+                break_meta[cs1.sid] = (mid, mid+1)
+                break_meta[cs2.sid] = (mid, mid+1)
+            else:
+                augmented.append(c)
+        else:
+            augmented.append(c)
+    cand = augmented
+
     # Index helpers
     # Per (day, hour) collect candidate shift ids by role that cover the hour
     cover_by_role_day_hour = {
@@ -594,14 +653,25 @@ def propose_schedule(
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         for c in cand:
             if solver.BooleanValue(x[c.sid]):
-                schedule_rows.append({
+                row = {
                     "employee_id": c.employee_id,
                     "role": c.role,
                     "day": c.day,
                     "start_hour": c.start_hour,
                     "end_hour": c.end_hour,
                     "length": c.length
-                })
+                }
+                # If this shift came from a split, include explicit break window
+                if c.sid in break_meta:
+                    b_start, b_end = break_meta[c.sid]
+                    row["has_break"] = True
+                    row["break_start_hour"] = b_start
+                    row["break_end_hour"] = b_end
+                else:
+                    row["has_break"] = False
+                    row["break_start_hour"] = None
+                    row["break_end_hour"] = None
+                schedule_rows.append(row)
 
     # Coverage summary
     def np_sum_int(mat):

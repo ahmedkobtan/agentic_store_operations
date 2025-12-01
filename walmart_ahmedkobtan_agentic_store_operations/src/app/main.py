@@ -18,6 +18,7 @@ st.set_page_config(page_title="Store Staffing Agent", layout="wide")
 engine = init_db(get_engine())
 
 st.title("Store Staffing Agent MVP")
+st.caption(f"Schema v{SCHEMA_VERSION}")
 
 col_left, col_right = st.columns([2,1])
 
@@ -45,8 +46,33 @@ with col_right:
     if st.button("Propose Schedule"):
         res = run_schedule(horizon_days=horizon_days)
         st.success(f"Schedule proposed run_id={res['summary']['run_id']}")
-        # Auto-run compliance and show panel
+        # Visualize proposed schedule with explicit breaks
         proposal_csv = ARTIFACT_OUT_DIR / "schedule_proposal.csv"
+        if proposal_csv.exists():
+            df_sched = pd.read_csv(proposal_csv, parse_dates=["day"]) if "day" in pd.read_csv(proposal_csv, nrows=1).columns else pd.read_csv(proposal_csv)
+            st.subheader("Schedule (head)")
+            st.dataframe(df_sched.head())
+            # Simple Gantt-style view per employee with break highlight
+            try:
+                import plotly.express as px
+                df_plot = df_sched.copy()
+                df_plot["start_ts"] = pd.to_datetime(df_plot["day"]) + pd.to_timedelta(df_plot["start_hour"], unit="h")
+                df_plot["end_ts"] = pd.to_datetime(df_plot["day"]) + pd.to_timedelta(df_plot["end_hour"], unit="h")
+                fig = px.timeline(df_plot, x_start="start_ts", x_end="end_ts", y="employee_id", color="role", hover_data=["has_break","break_start_hour","break_end_hour"])
+                fig.update_yaxes(autorange="reversed")
+                st.plotly_chart(fig, use_container_width=True)
+                # Overlay breaks as red bars
+                if "has_break" in df_plot.columns:
+                    df_b = df_plot[df_plot["has_break"] == True].dropna(subset=["break_start_hour","break_end_hour"])
+                    if not df_b.empty:
+                        df_b["break_start_ts"] = pd.to_datetime(df_b["day"]) + pd.to_timedelta(df_b["break_start_hour"], unit="h")
+                        df_b["break_end_ts"] = pd.to_datetime(df_b["day"]) + pd.to_timedelta(df_b["break_end_hour"], unit="h")
+                        fig_b = px.timeline(df_b, x_start="break_start_ts", x_end="break_end_ts", y="employee_id", color_discrete_sequence=["#ff4d4d"], hover_name="role")
+                        fig_b.update_traces(opacity=0.6, showlegend=False)
+                        st.plotly_chart(fig_b, use_container_width=True)
+            except Exception as e:
+                st.info(f"Install plotly for Gantt visualization. Error: {e}")
+        # Auto-run compliance and show panel
         comp_client = TestClient(compliance_app)
         comp_resp = comp_client.post(
             "/validate",
@@ -58,11 +84,31 @@ with col_right:
         if comp_resp.status_code == 200:
             comp = comp_resp.json()
             st.subheader("Compliance Results")
-            st.write(f"Pass: {comp['pass_']} | Schema v{comp['schema_version']}")
+            st.write(f"Pass: {comp['pass_']} | Schema v{comp['schema_version']} | Rules v{comp.get('rules_version')}")
             if comp['violations']:
                 vdf = pd.DataFrame(comp['violations'])
                 st.dataframe(vdf)
             st.caption(f"Checked rules: {', '.join(comp['checked_rules'])}")
+        # Metrics summary
+        summary_path = ARTIFACT_OUT_DIR / "schedule_summary.json"
+        if summary_path.exists():
+            import json as _json
+            summ = _json.loads(summary_path.read_text())
+            st.subheader("Schedule Metrics")
+            # Compute totals if not present
+            total_shortfall = sum(summ.get("shortfall_by_role_hours", {}).values()) if "total_shortfall_hours" not in summ else summ.get("total_shortfall_hours")
+            total_overstaff = sum(summ.get("overstaff_by_role_hours", {}).values()) if "total_overstaff_hours" not in summ else summ.get("total_overstaff_hours")
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("Cost", f"${summ.get('total_cost',0):.2f}")
+            col_b.metric("Shortfall Hrs", f"{total_shortfall}")
+            col_c.metric("Overstaff Hrs", f"{total_overstaff}")
+            # Role breakdown table
+            rb = pd.DataFrame({
+                "role": ["lead","cashier","floor"],
+                "shortfall_hours": [summ.get("shortfall_by_role_hours", {}).get("lead",0), summ.get("shortfall_by_role_hours", {}).get("cashier",0), summ.get("shortfall_by_role_hours", {}).get("floor",0)],
+                "overstaff_hours": [summ.get("overstaff_by_role_hours", {}).get("lead",0), summ.get("overstaff_by_role_hours", {}).get("cashier",0), summ.get("overstaff_by_role_hours", {}).get("floor",0)]
+            })
+            st.dataframe(rb)
     if st.button("Evaluate Current Schedule"):
         eval_schedule()
         # Show latest compliance again (if schedule exists)
@@ -76,6 +122,15 @@ with col_right:
                 st.write(f"Pass: {comp['pass_']}")
                 if comp['violations']:
                     st.dataframe(pd.DataFrame(comp['violations']))
+        summary_path = ARTIFACT_OUT_DIR / "schedule_summary.json"
+        if summary_path.exists():
+            import json as _json
+            summ = _json.loads(summary_path.read_text())
+            st.subheader("Current Metrics")
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("Cost", f"${summ.get('total_cost',0):.2f}")
+            col_b.metric("Shortfall Hrs", f"{summ.get('total_shortfall_hours',0)}")
+            col_c.metric("Overstaff Hrs", f"{summ.get('total_overstaff_hours',0)}")
     st.markdown("---")
     st.subheader("Feedback")
     schedule_id = st.text_input("Schedule ID (run_id)")
